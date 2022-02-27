@@ -5,3 +5,4 @@ old
 *.lock
 *_cache
 __pycache__
+dist
