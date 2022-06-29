@@ -6,56 +6,47 @@
 
 ``` python
 #!/usr/bin/env python3
-
+from pymarko.udpsocket import Publisher
+from pymarko.udpsocket import Subscriber
 import time
-from pymarko import get_ip
 import sys
-from pymarko.pubsub import Subscriber, Publisher
 
+HOST, PORT = "10.0.1.116", 9999
 
-def subfunc():
-
-    def myfunc(data):
-        if data:
-            msg = data.decode('utf8')
-            print(f">> Subscriber got: {msg}")
-
-    sub = Subscriber()
-    # sub.bind("bob", 9500)
-    sub.connect("bob", get_ip(), 9500)
-    sub.subscribe(myfunc)
-    sub.loop()
-
-def pubfunc():
+def pub():
     pub = Publisher()
-    pub.bind("bob", 9500)
-    pub.listen()
+    pub.info()
+    pub.clientaddr.append((HOST, PORT))
+    pub.clientaddr.append((HOST, 9998)) # this one will fail quietly
 
-    i = 0
-    while True:
-        msg = f"hello {i}".encode("utf8")
+    for _ in range(20):
+        msg = str(time.time()).encode("utf-8")
         pub.publish(msg)
-        time.sleep(1)
-        i += 1
+
+def sub():
+
+    def cb(data):
+        print(data)
+
+    try:
+        s = Subscriber()
+        s.bind(HOST, PORT)
+        s.info()
+        s.register_cb(cb)
+        s.loop()
+
+    except KeyboardInterrupt as e:
+        s.event = False
+        time.sleep(0.1)
+        print(e)
+        print("ctrl-z")
 
 
 if __name__ == "__main__":
-
-    if len(sys.argv) > 1:
-        func = sys.argv[1]
-    else:
-        func = "p"
-
-    try:
-        if func == "s":
-            subfunc()
-        elif func == "p":
-            pubfunc()
-
-    except KeyboardInterrupt:
-        print("shutting down")
-    finally:
-        print("end ------------------")
+    if sys.argv[1] == "p":
+        pub()
+    elif sys.argv[1] == "s":
+        sub()
 ```
 
 # MIT License

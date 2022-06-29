@@ -5,21 +5,14 @@
 # see LICENSE for full details
 ##############################################
 import socket
-from pymarko.ip import get_ip
-# from threading import Thread
-from colorama import Fore
+import time
 
 MAX_PACKET_SIZE = 6000
 
-"""
-sub.bind
-sub.multicast -> pub.listen
-pub.connect
-pub.publish -> sub.subscribe
-"""
 
+class UDPSocket:
+    sock = None
 
-class SocketUDP:
     """
     UDP doesn't have to connect to send/receive data to a server.
     """
@@ -29,35 +22,8 @@ class SocketUDP:
             self.sock.settimeout(timeout)
         self.MAX_PACKET_SIZE = MAX_PACKET_SIZE # maxpktsize or 30000
 
-        # self.connect = self.sock.connect
-        # self.send = self.sock.send
-        print(f"{Fore.GREEN}[ SocketUDP ]============================")
-        print(f"{Fore.CYAN}  proto: {self.sock.proto}")
-        print(f"  timeout: {self.sock.timeout}")
-        print(f"  family: {self.sock.family}")
-        print(f"  timeout: {self.sock.type}")
-        print(f"  blocking: {self.sock.getblocking()}")
-        print(f"  fileno: {self.sock.fileno()}")
-        print(f"{Fore.RESET}")
-
     def __del__(self):
         self.sock.close()
-
-    def recv(self, size):
-        """
-        Get data from remote host
-        Return: data
-        """
-        try:
-            data = self.sock.recv(size) #struct.calcsize('<L'))
-        except socket.timeout:
-            data = None
-        except ConnectionRefusedError:
-            a,p = self.sock.getpeername()
-            print(f"{Fore.RED}*** ConnectionRefusedError {a}:{p} ***{Fore.RESET}")
-            exit(1)
-        # data = struct.unpack('<L', data)
-        return data
 
     def recvfrom(self, size):
         """
@@ -69,25 +35,11 @@ class SocketUDP:
         except socket.timeout:
             data = None
             address = None
+        except ConnectionRefusedError:
+            a,p = self.sock.getpeername()
+            raise ConnectionRefusedError(f"*** ConnectionRefusedError {a}:{p} ***")
+
         return data, address
-
-    def send(self, data):
-        dlen = len(data)
-
-        if dlen > self.MAX_PACKET_SIZE:
-            split = self.MAX_PACKET_SIZE
-            num = dlen // split
-            rem = dlen % split
-            # print(f"{num} {rem}")
-            # self.sock.sendto(struct.pack('<LB',dlen, num+1), address)
-
-            for i in range(num):
-                self.sock.send(data[i*split:i*split+split])
-            self.sock.send(buffer[-rem:])
-        else:
-            # self.sock.sendto(struct.pack('<LB', dlen, 1), address)
-            self.sock.send(data)
-        return dlen
 
     def sendto(self, data, address):
         dlen = len(data)
@@ -107,104 +59,139 @@ class SocketUDP:
             self.sock.sendto(data, address)
         return dlen
 
-    def connect(self, address, port):
-        """
-        Connect sets the socket to (addr, port) and must use send/recv calls
-        to get/give data with.
-        """
-        self.sock.connect((address, port))
-        print("Connect:")
-        print("  remote:",self.sock.getpeername())
-        print("  local:",self.sock.getsockname())
+
+class Base:
+    socket = None
+    bind_addr = None
+
+    def __init__(self):
+        self.socket = UDPSocket()
+
+    def info(self):
+        print(f"[ SocketUDP ]============================")
+        print(f"  proto: {self.socket.sock.proto}")
+        print(f"  timeout: {self.socket.sock.timeout}")
+        print(f"  family: {self.socket.sock.family}")
+        print(f"  timeout: {self.socket.sock.type}")
+        print(f"  blocking: {self.socket.sock.getblocking()}")
+        print(f"  fileno: {self.socket.sock.fileno()}")
+        # print("  remote:",self.socket.sock.getpeername())
+        print("  local:",self.socket.sock.getsockname())
+        print(f"")
 
     def bind(self, address, port=None):
-        """
-        Bind doesn't limit the socket to one host/port and must use sendto/recvfrom
-        to get/give data with.
-        """
         port = 0 if port is None else port
-        server_address = (address, port)
-        self.sock.bind(server_address)
-        # self.bindaddress = self.sock.getsockname()
-        addr, port = self.sock.getsockname()
-        print(f">> Binding for on {addr}:{port}")
+        self.socket.sock.bind((address, port))
+        self.bind_addr = self.socket.sock.getsockname()
+        # print(f">> Binding for on {addr}:{port}")
 
-#
-# class Base:
-#     def __init__(self):
-#         self.sock = SocketUDP(timeout=0.1)
-#         print(">> Base init")
-#
-#     def bind(self, topic, port=None):
-#         addr = get_ip()
-#         self.sock.bind(addr,port)
-#         # addr, port = self.sock.bindaddress
-#         # print(f">> Binding for {topic} on {addr}:{port}")
-#         self.topic = topic
-#
-#     def connect(self, topic, addr, port):
-#         self.sock.connect(addr,port)
-#         if topic is not None:
-#             self.sock.send(f"s:{topic}".encode("utf8"))
-#         self.topic = topic
-#
-#
-# class Publisher(Base):
-#     count = 0
-#     thread = None
-#
-#     def __init__(self):
-#         super().__init__()
-#         # self.sock = SocketUDP()
-#         self.clientaddr = []
-#
-#     def __del__(self):
-#         if self.thread:
-#             self.thread.join()
-#
-#     def __listen(self):
-#         while True:
-#             data, addr = self.sock.recvfrom(100)
-#             if data:
-#                 msg = data.decode('utf8')
-#                 print(f">> Server got: {msg}")
-#
-#                 if msg == f's:{self.topic}':
-#                     self.clientaddr.append(addr)
-#                     print(f">> new {addr}")
-#                 elif msg == "shutdown":
-#                     self.clientaddr.remove(addr)
-#                     print(f"xx shutdown {addr}")
-#
-#     def listen(self):
-#         self.thread = Thread(target=self.__listen)
-#         self.thread.daemon = True
-#         self.thread.start()
-#
-#     def publish(self, data):
-#         for addr in self.clientaddr:
-#             self.sock.sendto(data, addr)
-#             print(f"<< publish to: {addr}")
-#
-#
-# class Subscriber(Base):
-#     event = True
-#     cb = []
-#     def __init__(self):
-#         super().__init__()
-#         # self.sock = SocketUDP()
-#
-#     def subscribe(self, callback, topic=None):
-#         # if topic is not None:
-#         #     self.sock.send(f"s:{topic}".encode("utf8"))
-#         self.cb.append(callback)
-#
-#     def loop(self, event=None):
-#         # while self.event.isSet():
-#         while self.event:
-#             data = self.sock.recv(100)
-#             # if data is None or len(data) == 0:
-#             #     print("-- no data")
-#             #     continue
-#             for callback in self.cb:
-#                 callback(data)
+
+class Subscriber(Base):
+    event = True
+    cb = [] # why array?
+    subscribedto = None
+
+    def __init__(self):
+        super().__init__()
+        # self.socket.sock.settimeout(1.0)
+
+    def __del__(self):
+        if self.subscribedto is not None:
+            self.socket.sendto(f"shutdown".encode("utf8"), self.subscribedto)
+
+    def register_cb(self, callback):
+        self.cb.append(callback)
+
+    def loop(self, datasize=100):
+        while self.event:
+            data, addr = self.socket.recvfrom(datasize)
+            if data is None or len(data) == 0:
+                # print("-- no data")
+                continue
+
+            for callback in self.cb:
+                callback(data)
+
+class Publisher(Base):
+    clientaddr = []
+
+    def __init__(self):
+        super().__init__()
+
+    def publish(self, data):
+        for addr in self.clientaddr:
+            self.socket.sendto(data, addr)
+
+
+class PublisherThread(Publisher):
+    thread = None
+
+    def __init__(self):
+        super().__init__()
+
+    def __del__(self):
+        if self.thread is not None:
+            self.thread.join()
+
+    def __listen(self):
+        while True:
+            data, addr = self.socket.recvfrom(100)
+            if data:
+                # print(f">> Server got: {data}")
+                try:
+                    msg = data.decode('utf8')
+                except:
+                    continue
+
+                if msg == "subscribe":
+                    self.clientaddr.append(addr)
+                    # print(f">> new {addr}")
+                elif msg == "shutdown":
+                    try:
+                        self.clientaddr.remove(addr)
+                        print(f"xxx shutdown {addr} xxx")
+                    except:
+                        pass
+
+    def listen(self):
+        self.thread = Thread(target=self.__listen)
+        self.thread.daemon = True
+        self.thread.start()
+
+
+
+##########################################################
+
+class Reply(Base):
+    event = True
+    cb = [] # why array?
+
+    def __init__(self, addr):
+        super().__init__()
+        a,p = addr
+        self.bind(a,p)
+
+    def register_cb(self, callback):
+        self.cb.append(callback)
+
+    def loop(self, datasize=100):
+        while self.event:
+            data, addr = self.socket.recvfrom(datasize)
+            if data is None or len(data) == 0:
+                # print("-- no data")
+                continue
+            # self.subscribedto = addr
+            # print(addr)
+            for callback in self.cb:
+                reply = callback(data)
+                if reply is not None:
+                    self.socket.sendto(reply, addr)
+
+class Request(Base):
+    def __init__(self):
+        super().__init__()
+
+    def request(self, data, addr, datasize=100):
+        self.socket.sendto(data, addr)
+        data, _ = self.socket.recvfrom(datasize)
+        return data

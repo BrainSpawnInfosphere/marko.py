@@ -6,3 +6,6 @@ old
 *_cache
 __pycache__
 dist
+
+archive
+dev

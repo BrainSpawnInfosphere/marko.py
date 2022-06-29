@@ -5,8 +5,8 @@
 ##############################################
 
 from importlib.metadata import version # type: ignore
-from .pubsub import Subscriber, Publisher
-from .udpsocket import SocketUDP
+from .udpsocket import Subscriber, Publisher, Reply, Request
+from .udpsocket import UDPSocket
 from .ip import get_ip
 
 __author__ = "Kevin Walchko"

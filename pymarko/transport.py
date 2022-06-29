@@ -56,10 +56,10 @@ class Ascii(Transport):
     Simple ASCII format to send info
     """
     def dumps(self, data):
-        return "|".join(data).encode('utf-8')
+        return ":".join(data).encode('utf-8')
 
     def loads(self, msg):
-        return msg.decode('utf-8').split("|")
+        return msg.decode('utf-8').split(":")
 
 
 class Json(Transport):
